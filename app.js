@@ -17,9 +17,21 @@ fetch("questions.json")
     allQuestions = data;
   });
 
+// spicy ON/OFF を取得（なければ常にON）
+function isSpicyEnabled() {
+  const el = document.getElementById("toggleSpicy");
+  if (!el) return true;
+  return el.checked;
+}
+
 // 重み付きランダムでカテゴリを選ぶ
 function pickCategory() {
-  const entries = Object.entries(RATE);
+  // spicy OFF のときは、抽選対象から spicy を外す（他の比率は「固定のまま」）
+  const entries = Object.entries(RATE).filter(([key]) => {
+    if (key === "spicy" && !isSpicyEnabled()) return false;
+    return true;
+  });
+
   const total = entries.reduce((sum, [, v]) => sum + v, 0);
   let r = Math.random() * total;
 
@@ -42,13 +54,27 @@ function nextQuestion() {
 
   do {
     const category = pickCategory();
-    const pool = allQuestions.filter(q => q.type === category);
 
-    if (pool.length === 0) continue;
+    // 念のため：spicy OFF なのに spicy を引いた場合はやり直し
+    if (category === "spicy" && !isSpicyEnabled()) {
+      safety++;
+      continue;
+    }
+
+    const pool = allQuestions.filter(q => q.type === category);
+    if (pool.length === 0) {
+      safety++;
+      continue;
+    }
 
     picked = pool[Math.floor(Math.random() * pool.length)];
     safety++;
-  } while (picked.text === lastQuestion && safety < 10);
+  } while (picked && picked.text === lastQuestion && safety < 10);
+
+  if (!picked) {
+    document.getElementById("question").textContent = "質問がありません";
+    return;
+  }
 
   lastQuestion = picked.text;
 
